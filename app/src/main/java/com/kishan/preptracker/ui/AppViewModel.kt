@@ -81,7 +81,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val mode = forcedMode ?: RulesEngine.weeklyReview(date, days.value, sessions.value, profile.value).mode
         val sets = plan?.exercises?.associate { pe ->
             val n = if (mode == "C") pe.compressedSets else pe.standardSets
-            val presc = Ladders.prescribe(Ladder.parse(profile.value.progPolicy), Program.EX[pe.id]!!, date, sessions.value)
+            val presc = Ladders.prescribe(Ladder.parse(profile.value.progPolicy), Program.resolve(pe.id)!!, date, sessions.value)
             pe.id to MutableList(n) { SetEntry(load = presc.load) }
         }?.toMutableMap() ?: mutableMapOf()
         repo.saveSession(date, SessionData(plan?.key ?: "off", mode, sets, LocalDateTime.now().toString()))
@@ -154,13 +154,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun addCatalogExercise(date: LocalDate, exId: String) = viewModelScope.launch {
         val s = sessions.value[date] ?: return@launch
         if (s.sets.containsKey(exId)) return@launch
-        val ex = Program.EX[exId] ?: return@launch
+        val ex = Program.resolve(exId, s) ?: return@launch
         val presc = Ladders.prescribe(Ladder.parse(profile.value.progPolicy), ex, date, sessions.value)
         s.sets[exId] = mutableListOf(SetEntry(load = presc.load))
         repo.saveSession(date, s)
     }
+    fun logLift(date: LocalDate, exId: String) = viewModelScope.launch {
+        var s = sessions.value[date]
+        if (s == null) {
+            val plan = Templates.dayFor(date, profile.value, sessions.value)
+            val mode = RulesEngine.weeklyReview(date, days.value, sessions.value, profile.value).mode
+            val sets = plan?.exercises?.associate { pe ->
+                val n = if (mode == "C") pe.compressedSets else pe.standardSets
+                val presc = Ladders.prescribe(Ladder.parse(profile.value.progPolicy), Program.resolve(pe.id)!!, date, sessions.value)
+                pe.id to MutableList(n) { SetEntry(load = presc.load) }
+            }?.toMutableMap() ?: mutableMapOf()
+            s = SessionData(plan?.key ?: "off", mode, sets, LocalDateTime.now().toString())
+        }
+        if (s.sets.containsKey(exId)) {
+            repo.saveSession(date, s)
+            return@launch
+        }
+        val ex = Program.resolve(exId, s) ?: return@launch
+        val presc = Ladders.prescribe(Ladder.parse(profile.value.progPolicy), ex, date, sessions.value)
+        s.sets[exId] = mutableListOf(SetEntry(load = presc.load))
+        repo.saveSession(date, s)
+    }
+    fun toggleGym(date: LocalDate) = viewModelScope.launch {
+        val cur = repo.getDay(date) ?: DayLogModel(date.toString())
+        repo.saveDay(cur.copy(gymAt = if (cur.gymAt == null) LocalDateTime.now().toString() else null))
+    }
     fun addCustomExercise(date: LocalDate, extra: ExtraExercise) = viewModelScope.launch {
-        val s = sessions.value[date] ?: return@launch
+        var s = sessions.value[date]
+        if (s == null) {
+            s = SessionData("off", "S", mutableMapOf(), LocalDateTime.now().toString())
+        }
         s.extras[extra.id] = extra
         s.sets[extra.id] = mutableListOf(SetEntry())
         repo.saveSession(date, s)

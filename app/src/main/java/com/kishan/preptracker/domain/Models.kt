@@ -111,6 +111,8 @@ data class Profile(
     val barKind: String = "barbell45",
     val weekStart: String = "mon",
     val restFlash: Boolean = true,
+    /** Encoded weekday slots, e.g. MON=push,TUE=pull,WED=. Blank means use the week template as-is. */
+    val weekSlots: String = "",
 )
 
 /** One day's log. *Src fields track where a value came from ("hc" or "manual"); manual always wins on sync. */
@@ -127,4 +129,5 @@ data class DayLogModel(
     val waistCm: Double? = null,
     val armCm: Double? = null,
     val note: String? = null,
+    val gymAt: String? = null,
 )

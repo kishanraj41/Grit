@@ -44,6 +44,7 @@ class ProfileStore(private val context: Context) {
         val barKind = stringPreferencesKey("barKind")
         val weekStart = stringPreferencesKey("weekStart")
         val restFlash = booleanPreferencesKey("restFlash")
+        val weekSlots = stringPreferencesKey("weekSlots")
     }
     val profile: Flow<Profile> = context.dataStore.data.map { p ->
         val d = Profile()
@@ -76,6 +77,7 @@ class ProfileStore(private val context: Context) {
             barKind = p[K.barKind] ?: d.barKind,
             weekStart = p[K.weekStart] ?: d.weekStart,
             restFlash = p[K.restFlash] ?: d.restFlash,
+            weekSlots = p[K.weekSlots] ?: d.weekSlots,
         )
     }
     suspend fun save(pr: Profile) {
@@ -110,6 +112,7 @@ class ProfileStore(private val context: Context) {
             e[K.barKind] = pr.barKind
             e[K.weekStart] = pr.weekStart
             e[K.restFlash] = pr.restFlash
+            e[K.weekSlots] = pr.weekSlots
         }
     }
 }

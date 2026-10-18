@@ -1,32 +1,43 @@
 package com.kishan.preptracker.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kishan.preptracker.domain.Attendance
 import com.kishan.preptracker.domain.DayLogModel
+import com.kishan.preptracker.domain.Templates
 import com.kishan.preptracker.domain.TodayLine
 import com.kishan.preptracker.health.StepSources
 import com.kishan.preptracker.ui.AppViewModel
+import com.kishan.preptracker.ui.components.LineChart
 import com.kishan.preptracker.ui.components.MiniStat
 import com.kishan.preptracker.ui.components.RecCard
 import com.kishan.preptracker.ui.components.ScreenHeader
 import com.kishan.preptracker.ui.components.Stat
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import kotlin.math.abs
 
 @Composable
 fun TodayScreen(vm: AppViewModel) {
     val days by vm.days.collectAsStateWithLifecycle()
+    val sessions by vm.sessions.collectAsStateWithLifecycle()
     val review by vm.review.collectAsStateWithLifecycle()
     val profile by vm.profile.collectAsStateWithLifecycle()
     val target by vm.target.collectAsStateWithLifecycle()
@@ -46,6 +57,49 @@ fun TodayScreen(vm: AppViewModel) {
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         ScreenHeader("Today", trailing = "$toShoot d")
+
+        val pulse = remember(days, sessions, profile.weekStart, today) { Attendance.pulse(today, sessions, days, profile.weekStart) }
+        val plan = remember(profile, sessions, today) { Templates.dayFor(today, profile, sessions) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            pulse.week.forEach { mark ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f).clickable { }) {
+                    Text(mark.date.format(DateTimeFormatter.ofPattern("EE")).take(2), style = MaterialTheme.typography.labelSmall, color = if (mark.isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    Box(
+                        Modifier.padding(top = 4.dp).size(28.dp).clip(CircleShape)
+                            .background(
+                                when {
+                                    mark.trained -> MaterialTheme.colorScheme.primary
+                                    mark.isToday -> MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+                                    else -> MaterialTheme.colorScheme.surfaceVariant
+                                },
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            mark.date.dayOfMonth.toString(),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (mark.trained) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Stat("This week", "${pulse.setsThisWeek} sets", "${pulse.sessionsThisWeek} sessions", Modifier.weight(1f))
+            Stat("Streak", "${pulse.streakWeeks} wk", "weeks with a hit", Modifier.weight(1f))
+        }
+        RecCard(
+            plan?.name ?: "Rest template",
+            if (plan == null) "No programmed lifts. Check in if you still trained."
+            else "${plan.sub} · ${plan.exercises.size} lifts",
+        )
+        Button(
+            onClick = { vm.toggleGym(today) },
+            modifier = Modifier.fillMaxWidth(),
+            colors = if (cur.gymAt != null) ButtonDefaults.buttonColors() else ButtonDefaults.outlinedButtonColors(),
+        ) { Text(if (cur.gymAt != null) "At the gym · checked in" else "At the gym · check in") }
 
         RecCard(TodayLine.compose(review, target), "One thing. The rest is noise.")
 
@@ -87,6 +141,15 @@ fun TodayScreen(vm: AppViewModel) {
             }
         }
 
+        val weightPts = remember(days) { days.entries.mapNotNull { e -> e.value.weight?.let { e.key to it } }.sortedBy { it.first }.takeLast(21) }
+        if (weightPts.isNotEmpty()) {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("Body weight", style = MaterialTheme.typography.labelLarge)
+                    LineChart(weightPts, unit = "kg")
+                }
+            }
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Stat("7-day avg", review.avg7?.let { "%.2f kg".format(it) } ?: "—", "${review.n7} weigh-ins", Modifier.weight(1f))
             Stat("Trend", review.trendKg?.let { "%.2f kg".format(it) } ?: "—", review.trendRate?.let { (if (it >= 0) "−" else "+") + "%.2f /wk".format(abs(it)) } ?: "—", Modifier.weight(1f))

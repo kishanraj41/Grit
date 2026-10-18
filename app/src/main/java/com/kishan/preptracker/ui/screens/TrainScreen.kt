@@ -48,6 +48,8 @@ fun TrainScreen(vm: AppViewModel) {
     var showMeas by remember { mutableStateOf(session == null) }
     var moveOpen by remember { mutableStateOf(false) }
     var cloneOpen by remember { mutableStateOf(false) }
+    var runMode by remember { mutableStateOf(true) }
+    var focus by remember { mutableIntStateOf(0) }
     val lastDone = sessions.keys.filter { it.isBefore(date) && sessions[it]?.sets?.values?.any { rows -> rows.any { s -> s.done } } == true }.maxOrNull()
     val day = days[date] ?: DayLogModel(date.toString())
     var measWeight by remember(day.weight, day.weightSrc) { mutableStateOf(day.weight?.toString() ?: "") }
@@ -128,6 +130,10 @@ fun TrainScreen(vm: AppViewModel) {
             TextButton(onClick = { cloneOpen = true }) { Text("Clone") }
             if (session.finishedAt != null) TextButton(onClick = { vm.reopenSession(date) }) { Text("Reopen") }
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = runMode, onClick = { runMode = true }, label = { Text("Run") }, modifier = Modifier.weight(1f))
+            FilterChip(selected = !runMode, onClick = { runMode = false }, label = { Text("List") }, modifier = Modifier.weight(1f))
+        }
         Spacer(Modifier.height(8.dp))
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 96.dp)) {
@@ -135,7 +141,19 @@ fun TrainScreen(vm: AppViewModel) {
                 TextButton(onClick = { showMeas = !showMeas }) { Text(if (showMeas) "Hide measurements" else "Measurements") }
                 if (showMeas) MeasurementsCard(day, measWeight, { measWeight = it }, measWaist, { measWaist = it }, measArm, { measArm = it }, vm)
             }
-            items(exerciseIds, key = { it }) { id ->
+            if (runMode && exerciseIds.isNotEmpty()) {
+                item {
+                    val i = focus.coerceIn(0, exerciseIds.lastIndex)
+                    val lift = Lifts.BY_ID[exerciseIds[i]]
+                    Text("Lift ${i + 1} of ${exerciseIds.size}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    if (lift != null) Text(lift.cue, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { focus = (i - 1).coerceAtLeast(0) }, enabled = i > 0, modifier = Modifier.weight(1f)) { Text("Previous") }
+                        Button(onClick = { focus = (i + 1).coerceAtMost(exerciseIds.lastIndex) }, enabled = i < exerciseIds.lastIndex, modifier = Modifier.weight(1f)) { Text("Next lift") }
+                    }
+                }
+            }
+            items(if (runMode) exerciseIds.getOrNull(focus.coerceIn(0, (exerciseIds.size - 1).coerceAtLeast(0)))?.let { listOf(it) }.orEmpty() else exerciseIds, key = { it }) { id ->
                 val ex = Program.resolve(id, session) ?: return@items
                 val sets = session.sets[id].orEmpty()
                 val presc = remember(sessions, date, id, profile.progPolicy) {
@@ -507,7 +525,7 @@ private fun ExerciseHistorySheet(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun AddExerciseDialog(
     already: Set<String>,
@@ -522,18 +540,27 @@ private fun AddExerciseDialog(
     var rest by remember { mutableStateOf("") }
     var inc by remember { mutableStateOf("") }
     var bodyweight by remember { mutableStateOf(false) }
-    val available = Program.EX.values.filter { it.id !in already }.sortedBy { it.name }
+    var query by remember { mutableStateOf("") }
+    var group by remember { mutableStateOf<String?>(null) }
+    val available = Lifts.search(query, group, null).filter { it.id !in already }
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
         title = { Text("Add exercise") },
         text = {
             Column(Modifier.fillMaxWidth().heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("From the v4 catalog", style = MaterialTheme.typography.labelLarge)
-                if (available.isEmpty()) Text("Every catalog exercise is already on this session.", style = MaterialTheme.typography.bodySmall)
-                available.forEach { ex ->
-                    TextButton(onClick = { onCatalog(ex.id) }, modifier = Modifier.fillMaxWidth()) {
-                        Text(ex.name, modifier = Modifier.fillMaxWidth())
+                Text("From the lift library", style = MaterialTheme.typography.labelLarge)
+                OutlinedTextField(query, { query = it }, label = { Text("Search") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    FilterChip(selected = group == null, onClick = { group = null }, label = { Text("All") })
+                    Lifts.GROUPS.forEach { g ->
+                        FilterChip(selected = group == g, onClick = { group = if (group == g) null else g }, label = { Text(g) })
+                    }
+                }
+                if (available.isEmpty()) Text("Nothing matches, or it is already on this session.", style = MaterialTheme.typography.bodySmall)
+                available.forEach { lift ->
+                    TextButton(onClick = { onCatalog(lift.id) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("${lift.name} · ${lift.equipment}", modifier = Modifier.fillMaxWidth())
                     }
                 }
                 HorizontalDivider()

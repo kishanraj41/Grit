@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.*
@@ -69,6 +70,7 @@ fun App(vm: AppViewModel) {
     val tabs = listOf(
         Triple("today", "Today", Icons.Default.Today),
         Triple("train", "Train", Icons.Default.FitnessCenter),
+        Triple("lifts", "Lifts", Icons.Default.Search),
         Triple("trends", "Trends", Icons.AutoMirrored.Filled.ShowChart),
         Triple("review", "Review", Icons.Default.Checklist),
         Triple("plan", "Plan", Icons.Default.Settings),
@@ -99,6 +101,7 @@ fun App(vm: AppViewModel) {
             NavHost(nav, startDestination = "today") {
                 composable("today") { TodayScreen(vm) }
                 composable("train") { TrainScreen(vm) }
+                composable("lifts") { LiftsScreen(vm) }
                 composable("trends") { TrendsScreen(vm) }
                 composable("review") { ReviewScreen(vm) }
                 composable("plan") { PlanScreen(vm, onRequestPermissions = { permLauncher.launch(vm.hc.permissions) }) }

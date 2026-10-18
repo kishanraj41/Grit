@@ -70,7 +70,8 @@ object Muscles {
         "ezcurl" to (listOf("biceps") to listOf("forearms")),
     )
 
-    fun parts(exId: String): Pair<List<String>, List<String>> = of[exId] ?: (emptyList<String>() to emptyList())
+    fun parts(exId: String): Pair<List<String>, List<String>> =
+        of[exId] ?: Lifts.BY_ID[exId]?.let { it.primary to it.assist } ?: (emptyList<String>() to emptyList())
 
     fun snapshot(now: LocalDate, sessions: Map<LocalDate, SessionData>): List<MuscleState> {
         val fatigue = ORDER.associateWith { 0.0 }.toMutableMap()

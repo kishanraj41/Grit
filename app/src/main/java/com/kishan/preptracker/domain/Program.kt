@@ -85,7 +85,7 @@ object Program {
     fun dayFor(d: LocalDate): DayPlan? = DAYS[d.dayOfWeek]
 
     fun resolve(id: String, session: SessionData? = null): Exercise? =
-        EX[id] ?: session?.extras?.get(id)?.toExercise()
+        EX[id] ?: Lifts.BY_ID[id]?.ex ?: session?.extras?.get(id)?.toExercise()
 
     val GOAL_RATE = mapOf("A" to 0.45, "B" to 0.62)
 }

@@ -17,10 +17,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kishan.preptracker.domain.Load
 import com.kishan.preptracker.domain.Program
 import com.kishan.preptracker.domain.Templates
+import com.kishan.preptracker.domain.WeekSlots
 import com.kishan.preptracker.health.StepSources
 import com.kishan.preptracker.ui.AppViewModel
 import com.kishan.preptracker.ui.components.ScreenHeader
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.format.TextStyle
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -58,9 +62,45 @@ fun PlanScreen(vm: AppViewModel, onRequestPermissions: () -> Unit) {
     var barKg by remember(p.barWeightKg) { mutableStateOf(p.barWeightKg.toString()) }
     var plates by remember(p.platesKg) { mutableStateOf(p.platesKg.joinToString(",")) }
     val today = LocalDate.now()
+    var slotDay by remember { mutableStateOf<DayOfWeek?>(null) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         ScreenHeader("Plan")
+
+        Text("This week", style = MaterialTheme.typography.titleMedium)
+        if (p.schedule == "queue") {
+            Text("Queue mode ignores the weekday board. Switch to weekday clock to pin routines.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        val board = remember(p.weekTemplate, p.weekSlots) { Templates.board(p) }
+        val days = if (p.weekStart == "sun") listOf(DayOfWeek.SUNDAY) + DayOfWeek.entries.filter { it != DayOfWeek.SUNDAY } else DayOfWeek.entries
+        days.forEach { d ->
+            val plan = board[d]
+            Card(Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(d.getDisplayName(TextStyle.FULL, Locale.US), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(plan?.name ?: "Rest", style = MaterialTheme.typography.titleSmall)
+                        if (plan != null) Text("${plan.exercises.size} lifts · ${plan.sub}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    TextButton(onClick = { slotDay = d }, enabled = p.schedule != "queue") { Text(if (plan == null) "Add" else "Change") }
+                }
+            }
+        }
+        slotDay?.let { day ->
+            AlertDialog(
+                onDismissRequest = { slotDay = null },
+                title = { Text("Routine · ${day.getDisplayName(TextStyle.FULL, Locale.US)}") },
+                text = {
+                    Column {
+                        TextButton(onClick = { vm.saveProfile(WeekSlots.assign(p, day, null)); slotDay = null }) { Text("Rest") }
+                        Templates.routines().forEach { r ->
+                            TextButton(onClick = { vm.saveProfile(WeekSlots.assign(p, day, r.key)); slotDay = null }) { Text("${r.name} · ${r.exercises.size} lifts") }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { slotDay = null }) { Text("Close") } },
+            )
+        }
 
         Text("Health Connect", style = MaterialTheme.typography.titleMedium)
         Card(Modifier.fillMaxWidth()) {
@@ -123,7 +163,7 @@ fun PlanScreen(vm: AppViewModel, onRequestPermissions: () -> Unit) {
         Text("Same catalog, different clock. v4 stays the prep default.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Templates.ALL.forEach { pack ->
-                FilterChip(selected = p.weekTemplate == pack.id, onClick = { vm.saveProfile(p.copy(weekTemplate = pack.id)) }, label = { Text(pack.name) })
+                FilterChip(selected = p.weekTemplate == pack.id, onClick = { vm.saveProfile(p.copy(weekTemplate = pack.id, weekSlots = "")) }, label = { Text(pack.name) })
             }
         }
         Text(Templates.pack(p.weekTemplate).blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

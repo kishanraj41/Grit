@@ -75,9 +75,23 @@ object Templates {
 
     fun pack(id: String?): WeekPack = ALL.firstOrNull { it.id == id } ?: V4
 
+    fun routines(): List<DayPlan> =
+        (ALL.flatMap { it.byWeekday.values + it.queue } + Program.DAYS.values).distinctBy { it.key }
+
+    fun routine(key: String?): DayPlan? = key?.let { k -> routines().firstOrNull { it.key == k } }
+
+    /** Seven weekdays. Null plan is rest. Honors saved slots when the user has edited the board. */
+    fun board(profile: Profile): Map<DayOfWeek, DayPlan?> {
+        val pack = pack(profile.weekTemplate)
+        val saved = WeekSlots.parse(profile.weekSlots)
+        return DayOfWeek.entries.associateWith { d ->
+            if (saved != null) routine(saved[d]?.ifBlank { null }) else pack.byWeekday[d]
+        }
+    }
+
     fun dayFor(date: LocalDate, profile: Profile, sessions: Map<LocalDate, SessionData>): DayPlan? {
         val pack = pack(profile.weekTemplate)
-        return if (profile.schedule == "queue") nextInQueue(date, sessions, pack.queue) else pack.byWeekday[date.dayOfWeek]
+        return if (profile.schedule == "queue") nextInQueue(date, sessions, pack.queue) else board(profile)[date.dayOfWeek]
     }
 
     fun nextInQueue(date: LocalDate, sessions: Map<LocalDate, SessionData>, queue: List<DayPlan>): DayPlan? {
@@ -102,4 +116,34 @@ object Templates {
         listOf(p("squat",3,3), p("rdl",3,2), p("hack",2,2), p("seatcurl",3,2), p("stcalf",3,2), p("crunch",3,2)))
     private fun full() = DayPlan("full", "Full body", "anchors plus arms",
         listOf(p("squat",3,3), p("incbench",3,2), p("pullup",3,2), p("rdl",2,2), p("ohp",2,2), p("cablat",3,2), p("preacher",2,2)))
+}
+
+object WeekSlots {
+    private val order = listOf(
+        DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY,
+        DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY,
+    )
+
+    fun token(d: DayOfWeek): String = d.name.take(3)
+
+    fun parse(raw: String?): Map<DayOfWeek, String>? {
+        if (raw.isNullOrBlank()) return null
+        val out = mutableMapOf<DayOfWeek, String>()
+        raw.split(",").forEach { part ->
+            val bits = part.split("=", limit = 2)
+            if (bits.size != 2) return@forEach
+            val day = order.firstOrNull { token(it) == bits[0].trim().uppercase() } ?: return@forEach
+            out[day] = bits[1].trim()
+        }
+        return out
+    }
+
+    fun encode(slots: Map<DayOfWeek, String>): String =
+        order.joinToString(",") { d -> "${token(d)}=${slots[d] ?: ""}" }
+
+    fun assign(profile: Profile, day: DayOfWeek, key: String?): Profile {
+        val current = Templates.board(profile).mapValues { (_, plan) -> plan?.key ?: "" }.toMutableMap()
+        current[day] = key ?: ""
+        return profile.copy(weekSlots = encode(current))
+    }
 }

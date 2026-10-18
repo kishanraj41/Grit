@@ -64,10 +64,10 @@ class Repository(context: Context) {
 
     private fun DayLogEntity.toModel() = DayLogModel(
         date, weight, weightSrc, sleepH, sleepSrc, steps, stepsSrc, kcal, kcalSrc, protein, proteinSrc,
-        rhr, rhrSrc, hrvMs, hrvSrc, waistCm, armCm, note,
+        rhr, rhrSrc, hrvMs, hrvSrc, waistCm, armCm, note, gymAt,
     )
     private fun DayLogModel.toEntity() = DayLogEntity(
         date, weight, weightSrc, sleepH, sleepSrc, steps, stepsSrc, kcal, kcalSrc, protein, proteinSrc,
-        rhr, rhrSrc, hrvMs, hrvSrc, waistCm, armCm, note,
+        rhr, rhrSrc, hrvMs, hrvSrc, waistCm, armCm, note, gymAt,
     )
 }

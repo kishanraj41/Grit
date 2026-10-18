@@ -52,15 +52,16 @@ flowchart LR
   UI -->|Train sessions stay local| ROOM
 ```
 
-## Five rooms
+## Rooms
 
 | | Tab | You get |
 | :--- | :--- | :--- |
-| 01 | **Today** | One line of advice. Weight, kcal, protein, sleep, steps, RHR/HRV. 7-day avg and trend. |
-| 02 | **Train** | Standard or Compressed start. `-5` / `+5` lb. Tap to type. US plates on the bar you pick (45 / EZ 25 / trap 55 / smith 30). Warm-up, drop, rest-pause, timed, cardio, RPE, L/R, fail, supersets. Copy a set, move or clone a day, reopen a finished session. Orange flash when rest ends. Screen stays awake. |
-| 03 | **Trends** | Drag a chart. Calendar-true gaps. 52-week heatmap. Muscle Recover / Dose / Quiet. Balance vs close-grip bench. Weight chart goal line. Anchor 1RMs in lb. |
-| 04 | **Review** | Sleep, anchors, rate of loss. Compressed vs Standard. Diet levers. |
-| 05 | **Plan** | Health Connect. Week shape (v4, PPL, upper/lower, full body) on a weekday clock or next-in-queue. JSON backup. Strong / Hevy / FitNotes CSV. Ladder policy. 1RM formula. |
+| 01 | **Today** | Week strip. Gym check-in. Streak. Today's routine. Bodyweight spark. One line of advice. Health Connect tiles. |
+| 02 | **Train** | Run one lift at a time, or List. Standard or Compressed. `-5` / `+5` lb. Text cues, not stolen GIFs. US plates. Warm-up, drop, rest-pause, timed, cardio, RPE, L/R. Orange flash when rest ends. |
+| 03 | **Lifts** | Searchable library with muscle and equipment filters. Log onto today. Roll your own lift. |
+| 04 | **Trends** | Month/week counts. 52-week heatmap. Front/back muscle map. Recover / Dose / Quiet. Goal line on weight. |
+| 05 | **Review** | Sleep, anchors, rate of loss. Compressed vs Standard. Diet levers. |
+| 06 | **Plan** | Pin a routine on each weekday, or rest. v4 / PPL / upper-lower / full body as a starting clock. Health Connect. JSON backup. CSV import. |
 
 ## Signature
 

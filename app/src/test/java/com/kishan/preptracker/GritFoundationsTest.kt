@@ -124,6 +124,61 @@ class TemplatesTest {
     }
 }
 
+class AttendanceTest {
+    @Test fun `a finished work set counts as a gym hit`() {
+        val d = LocalDate.parse("2026-09-22")
+        val sessions = mapOf(d to SessionData("tue", "S", mutableMapOf(
+            "squat" to mutableListOf(SetEntry(100.0, 5, 2, true)),
+        ), "t"))
+        assertTrue(Attendance.trained(d, sessions, emptyMap()))
+        assertFalse(Attendance.trained(d.plusDays(1), sessions, emptyMap()))
+    }
+
+    @Test fun `check-in without sets still counts`() {
+        val d = LocalDate.parse("2026-09-22")
+        val days = mapOf(d to DayLogModel(d.toString(), gymAt = "2026-09-22T18:00"))
+        assertTrue(Attendance.trained(d, emptyMap(), days))
+    }
+
+    @Test fun `streak skips an empty current week`() {
+        val today = LocalDate.parse("2026-09-22") // Tuesday
+        val lastMon = LocalDate.parse("2026-09-14")
+        val sessions = mapOf(lastMon to SessionData("mon", "S", mutableMapOf(
+            "ohp" to mutableListOf(SetEntry(60.0, 6, 2, true)),
+        ), "t"))
+        assertEquals(1, Attendance.streakWeeks(today, sessions, emptyMap(), "mon"))
+    }
+}
+
+class WeekBoardTest {
+    @Test fun `blank slots follow the v4 weekday clock`() {
+        val d = LocalDate.parse("2026-09-21")
+        val plan = Templates.dayFor(d, Profile(weekTemplate = "v4", weekSlots = ""), emptyMap())
+        assertEquals("mon", plan?.key)
+    }
+
+    @Test fun `a saved rest day wins over the template`() {
+        val d = LocalDate.parse("2026-09-21")
+        val slots = "MON=,TUE=pull,WED=,THU=,FRI=,SAT=,SUN="
+        val plan = Templates.dayFor(d, Profile(weekTemplate = "ppl", weekSlots = slots), emptyMap())
+        assertNull(plan)
+    }
+}
+
+class LiftsLibraryTest {
+    @Test fun `every v4 id is in the library`() {
+        Program.EX.keys.forEach { id ->
+            assertNotNull(id, Lifts.BY_ID[id])
+        }
+    }
+
+    @Test fun `chest filter hides squats`() {
+        val hits = Lifts.search("", "chest", null)
+        assertTrue(hits.any { it.id == "incbench" })
+        assertTrue(hits.none { it.id == "squat" })
+    }
+}
+
 class MuscleDoseTest {
     @Test fun `seven-day volume counts squat work sets on quads`() {
         val d = LocalDate.parse("2026-09-22")

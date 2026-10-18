@@ -19,6 +19,7 @@ data class DayLogEntity(
     val waistCm: Double? = null,
     val armCm: Double? = null,
     val note: String? = null,
+    val gymAt: String? = null,
 )
 
 @Entity(tableName = "sessions")
@@ -52,7 +53,7 @@ interface SessionDao {
  * Additive migrations only. Never fall back to destructive — Train sessions and
  * day logs live only in this database.
  */
-@Database(entities = [DayLogEntity::class, SessionEntity::class], version = 2, exportSchema = true)
+@Database(entities = [DayLogEntity::class, SessionEntity::class], version = 3, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dayLogs(): DayLogDao
     abstract fun sessions(): SessionDao
@@ -64,7 +65,12 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE day_logs ADD COLUMN hrvSrc TEXT")
             }
         }
-        val MIGRATIONS = arrayOf(MIGRATION_1_2)
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE day_logs ADD COLUMN gymAt TEXT")
+            }
+        }
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
 
         @Volatile private var INSTANCE: AppDatabase? = null
         fun get(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {

@@ -18,7 +18,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kishan.preptracker.domain.*
 import com.kishan.preptracker.ui.AppViewModel
 import com.kishan.preptracker.ui.components.LineChart
+import com.kishan.preptracker.ui.components.MuscleMap
 import com.kishan.preptracker.ui.components.ScreenHeader
+import com.kishan.preptracker.ui.components.Stat
 import java.time.LocalDate
 
 @Composable
@@ -34,11 +36,18 @@ fun TrendsScreen(vm: AppViewModel) {
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         ScreenHeader("Trends")
+        val pulse = remember(sessions, days, profile.weekStart) { Attendance.pulse(LocalDate.now(), sessions, days, profile.weekStart) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Stat("Month", "${pulse.monthSessions}", "sessions", Modifier.weight(1f))
+            Stat("Week", "${pulse.sessionsThisWeek}", "${pulse.setsThisWeek} sets", Modifier.weight(1f))
+            Stat("Weight 7d", pulse.weekDeltaKg?.let { (if (it >= 0) "+" else "") + "%.1f kg".format(it) } ?: "—", "vs 7 days ago", Modifier.weight(1f))
+        }
         val heat = remember(sessions, profile.weekStart) { Heatmap.cells(sessions, weeks = 52, weekStart = profile.weekStart) }
         ChartCard("Training heatmap (52 weeks)") {
             Row(Modifier.horizontalScroll(rememberScrollState())) { HeatGrid(heat) }
         }
         val muscles = remember(sessions) { Muscles.snapshot(LocalDate.now(), sessions) }
+        ChartCard("Muscle map") { MuscleMap(muscles) }
         var muscleMode by remember { mutableStateOf("recover") }
         ChartCard("Muscle status") {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
