@@ -130,7 +130,7 @@ object RulesEngine {
                         val since = p.leverDate?.let { ChronoUnit.DAYS.between(LocalDate.parse(it), ref) } ?: 99
                         when {
                             since < 14 -> recs += Recommendation("diet", "Hold — last lever applied $since days ago", "Give a lever two full weeks before pulling the next one.")
-                            p.lever == 0 -> recs += Recommendation("diet", "Lever 1: audit the food log", "Two slow weeks. Before cutting anything: check MacroFactor entries against 4×(C+P)+9×F and re-weigh the portions that drift.", 1)
+                            p.lever == 0 -> recs += Recommendation("diet", "Lever 1: audit the food log", "Two slow weeks. Before cutting anything: check logged meals against 4×(C+P)+9×F and re-weigh the portions that drift.", 1)
                             p.lever == 1 -> recs += Recommendation("diet", "Lever 2: add the 45-min LISS block", "Log verified and still slow. 5–6 × 45 min walking/incline/bike, separated from lifting. Not food yet.", 2)
                             p.lever == 2 -> recs += Recommendation("diet", "Lever 3: −25 g carbs (rice at dinner)", "The only food cut authorised. ~100 kcal/day.", 3)
                             else -> recs += Recommendation("diet", "All levers used — hold and review", "Rate still below target after logging, cardio and the carb cut. Look at sleep, adherence, water.")

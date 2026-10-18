@@ -41,9 +41,13 @@ flowchart LR
     ROOM[(Room prep.db)]
     UI[Grit UI]
   end
-  Fitbit -->|steps sleep HRV RHR| HC
-  MacroFactor -->|kcal protein weight| HC
-  HC -->|Fitbit wins steps| ROOM
+  Watch[Any watch / band]
+  Diet[Any food log]
+  Scale[Any scale]
+  Watch -->|steps sleep HRV RHR| HC
+  Diet -->|kcal protein| HC
+  Scale -->|weight| HC
+  HC -->|one writer per metric| ROOM
   UI <--> ROOM
   UI -->|Train sessions stay local| ROOM
 ```
@@ -63,7 +67,7 @@ flowchart LR
 ```
 LOADS     225 lb     gym plates, 5 lb jumps
 SCALE      86.4 kg   Health Connect / tape
-STEPS      Fitbit    never Fitbit + watch summed
+STEPS      Auto      one writer per day, never two apps summed
 LOGIC      domain/   pure Kotlin, unit-tested
 STORE      Room      prep.db on device, not the cloud
 ```
@@ -74,13 +78,13 @@ STORE      Room      prep.db on device, not the cloud
 
 | In | Out |
 | :--- | :--- |
-| Fitbit via Health Connect: steps, sleep, RHR, HRV | Train sessions: **local only** |
-| MacroFactor via Health Connect: nutrition, scale weight | JSON backup you export |
-| Manual tags beat sync | CSV in from Strong / Hevy / FitNotes |
+| Whatever your watch, band, scale, or food log writes to Health Connect | Train sessions: **local only** |
+| Manual tags beat sync | JSON backup you export |
+| Pin a writer in Plan, or leave Auto | CSV in from Strong / Hevy / FitNotes |
 
-Connect path: **Plan → Connect → Backfill 30 days**.
+Connect path: **Plan → Connect → Backfill 30 days**, then pick Movement and Food writers if you run more than one.
 
-If Samsung Health also writes steps, Grit keeps **one writer per day** (Fitbit first).
+Grit never sums two apps for the same metric. Auto keeps the largest single writer that day.
 
 ## Build
 

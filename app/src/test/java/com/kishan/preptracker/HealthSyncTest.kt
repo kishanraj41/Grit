@@ -3,7 +3,6 @@ package com.kishan.preptracker
 import com.kishan.preptracker.domain.DayLogModel
 import com.kishan.preptracker.health.HealthDay
 import com.kishan.preptracker.health.HealthWindows
-import com.kishan.preptracker.health.StepSources
 import com.kishan.preptracker.sync.HealthSync
 import org.junit.Assert.*
 import org.junit.Test
@@ -50,9 +49,9 @@ class HealthSyncTest {
 
     @Test fun `steps keep the chosen Health Connect writer`() {
         val cur = DayLogModel("2026-09-20")
-        val next = HealthSync.merge(cur, incoming(steps = 9200).copy(stepsApp = StepSources.FITBIT))
+        val next = HealthSync.merge(cur, incoming(steps = 9200).copy(stepsApp = "com.brand.watch"))
         assertEquals(9200, next.steps)
-        assertEquals("hc:com.fitbit.FitbitMobile", next.stepsSrc)
+        assertEquals("hc:com.brand.watch", next.stepsSrc)
     }
 
     @Test fun `hc-sourced fields update when Health Connect sends a new value`() {

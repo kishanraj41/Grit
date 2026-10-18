@@ -37,6 +37,8 @@ class ProfileStore(private val context: Context) {
         val platesKg = stringPreferencesKey("platesKg")
         val progPolicy = stringPreferencesKey("progPolicy")
         val oneRmFormula = stringPreferencesKey("oneRmFormula")
+        val wearablePkg = stringPreferencesKey("wearablePkg")
+        val foodPkg = stringPreferencesKey("foodPkg")
     }
     val profile: Flow<Profile> = context.dataStore.data.map { p ->
         val d = Profile()
@@ -62,6 +64,8 @@ class ProfileStore(private val context: Context) {
             platesKg = p[K.platesKg]?.split(",")?.mapNotNull { it.trim().toDoubleOrNull() }?.takeIf { it.isNotEmpty() } ?: d.platesKg,
             progPolicy = p[K.progPolicy] ?: d.progPolicy,
             oneRmFormula = p[K.oneRmFormula] ?: d.oneRmFormula,
+            wearablePkg = p[K.wearablePkg],
+            foodPkg = p[K.foodPkg],
         )
     }
     suspend fun save(pr: Profile) {
@@ -89,6 +93,8 @@ class ProfileStore(private val context: Context) {
             e[K.platesKg] = pr.platesKg.joinToString(",")
             e[K.progPolicy] = pr.progPolicy
             e[K.oneRmFormula] = pr.oneRmFormula
+            if (pr.wearablePkg != null) e[K.wearablePkg] = pr.wearablePkg else e.remove(K.wearablePkg)
+            if (pr.foodPkg != null) e[K.foodPkg] = pr.foodPkg else e.remove(K.foodPkg)
         }
     }
 }

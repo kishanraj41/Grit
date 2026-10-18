@@ -57,7 +57,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /* ---- sync ---- */
     val syncMessage = MutableStateFlow("")
     val hcPermitted = MutableStateFlow<Boolean?>(null)
-    fun refreshPermissionState() = viewModelScope.launch { hcPermitted.value = if (hc.isAvailable) runCatching { hc.hasAllPermissions() }.getOrDefault(false) else false }
+    val hcWriters = MutableStateFlow(HealthConnectManager.Writers(emptyList(), emptyList()))
+    fun refreshPermissionState() = viewModelScope.launch {
+        hcPermitted.value = if (hc.isAvailable) runCatching { hc.hasAllPermissions() }.getOrDefault(false) else false
+        if (hcPermitted.value == true) {
+            hcWriters.value = runCatching { hc.listWriters() }.getOrDefault(HealthConnectManager.Writers(emptyList(), emptyList()))
+        }
+    }
     fun syncNow(daysBack: Int = 3) = viewModelScope.launch {
         syncMessage.value = "Syncing…"
         val n = runCatching { HealthSync.syncRecent(getApplication(), daysBack) }.getOrElse { -1 }

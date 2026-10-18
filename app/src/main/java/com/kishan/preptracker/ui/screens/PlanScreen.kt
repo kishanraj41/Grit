@@ -2,6 +2,8 @@ package com.kishan.preptracker.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -13,6 +15,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kishan.preptracker.domain.Program
+import com.kishan.preptracker.health.StepSources
 import com.kishan.preptracker.ui.AppViewModel
 import com.kishan.preptracker.ui.components.ScreenHeader
 import java.time.LocalDate
@@ -22,6 +25,7 @@ import java.time.LocalDate
 fun PlanScreen(vm: AppViewModel, onRequestPermissions: () -> Unit) {
     val p by vm.profile.collectAsStateWithLifecycle()
     val permitted by vm.hcPermitted.collectAsStateWithLifecycle()
+    val writers by vm.hcWriters.collectAsStateWithLifecycle()
     val backupMsg by vm.backupMessage.collectAsStateWithLifecycle()
     var confirmImport by remember { mutableStateOf(false) }
     val createBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -59,12 +63,21 @@ fun PlanScreen(vm: AppViewModel, onRequestPermissions: () -> Unit) {
         Text("Health Connect", style = MaterialTheme.typography.titleMedium)
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(if (!vm.hc.isAvailable) "Health Connect is not available on this device." else if (permitted == true) "Connected — reads steps, sleep, heart rate, HRV, weight, nutrition." else "Not connected.", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    if (!vm.hc.isAvailable) "Health Connect is not available on this device."
+                    else if (permitted == true) "Connected. Any watch, scale, or food log that writes to Health Connect can feed Grit."
+                    else "Not connected.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = onRequestPermissions, enabled = vm.hc.isAvailable) { Text(if (permitted == true) "Re-check permissions" else "Connect") }
                     OutlinedButton(onClick = { vm.syncNow(daysBack = 30) }, enabled = permitted == true) { Text("Backfill 30 days") }
                 }
-                Text("MacroFactor → More → Integrations → Health Connect: turn on nutrition and weight export so calories, protein and scale weight flow in.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("In each fitness app, turn on Health Connect export (steps, sleep, heart, weight, nutrition). Grit never talks to those apps directly.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val movementApps = (writers.movement + listOfNotNull(p.wearablePkg)).distinct()
+                val foodApps = (writers.food + listOfNotNull(p.foodPkg)).distinct()
+                WriterPicker("Movement (steps, sleep, RHR, HRV)", p.wearablePkg, movementApps) { vm.saveProfile(p.copy(wearablePkg = it)) }
+                WriterPicker("Food and scale (kcal, protein, weight)", p.foodPkg, foodApps) { vm.saveProfile(p.copy(foodPkg = it)) }
             }
         }
 
@@ -174,5 +187,21 @@ fun PlanScreen(vm: AppViewModel, onRequestPermissions: () -> Unit) {
             TextButton(onClick = { vm.saveProfile(p.copy(lever = 0, leverDate = null)) }) { Text("Reset lever") }
         }
         Spacer(Modifier.height(80.dp))
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun WriterPicker(title: String, selected: String?, options: List<String>, onPick: (String?) -> Unit) {
+    Text(title, style = MaterialTheme.typography.labelLarge)
+    Text("Auto keeps the largest single writer that day. Two apps are never added together.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        FilterChip(selected = selected == null, onClick = { onPick(null) }, label = { Text("Auto") })
+        options.forEach { pkg ->
+            FilterChip(selected = selected == pkg, onClick = { onPick(pkg) }, label = { Text(StepSources.label(pkg)) })
+        }
+    }
+    if (options.isEmpty()) {
+        Text("Connect and backfill to list whoever is writing on this phone.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

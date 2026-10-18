@@ -54,12 +54,38 @@ class HealthConnectManager(private val context: Context) {
 
     suspend fun readDay(date: LocalDate): HealthDay = readRange(date, date).getValue(date)
 
+    data class Writers(val movement: List<String>, val food: List<String>)
+
+    /** Packages that wrote movement or food in the last [daysBack] days. */
+    suspend fun listWriters(daysBack: Int = 14): Writers {
+        val zone = ZoneId.systemDefault()
+        val to = LocalDate.now()
+        val from = to.minusDays((daysBack - 1).coerceAtLeast(0).toLong())
+        val filter = TimeRangeFilter.between(from.atStartOfDay(), to.plusDays(1).atStartOfDay())
+        val night = TimeRangeFilter.between(HealthWindows.nightStart(from, zone), HealthWindows.nightEnd(to, zone))
+        val movement = (
+            readAll(StepsRecord::class, filter).map { it.metadata.dataOrigin.packageName } +
+            readAll(SleepSessionRecord::class, night).map { it.metadata.dataOrigin.packageName } +
+            readAll(RestingHeartRateRecord::class, filter).map { it.metadata.dataOrigin.packageName } +
+            readAll(HeartRateVariabilityRmssdRecord::class, night).map { it.metadata.dataOrigin.packageName }
+        ).distinct().sorted()
+        val food = (
+            readAll(NutritionRecord::class, filter).map { it.metadata.dataOrigin.packageName } +
+            readAll(WeightRecord::class, filter).map { it.metadata.dataOrigin.packageName }
+        ).distinct().sorted()
+        return Writers(movement, food)
+    }
+
     /**
      * One pass over Health Connect for every local day in [from]..[toInclusive].
-     * - steps, nutrition, weight, resting HR: records whose time falls on that calendar day
-     * - sleep + HRV: records overlapping 18:00 the previous day to 14:00 that day
+     * Each metric uses one writer: [wearablePkg] / [foodPkg] if set, else the largest that day.
      */
-    suspend fun readRange(from: LocalDate, toInclusive: LocalDate): Map<LocalDate, HealthDay> {
+    suspend fun readRange(
+        from: LocalDate,
+        toInclusive: LocalDate,
+        wearablePkg: String? = null,
+        foodPkg: String? = null,
+    ): Map<LocalDate, HealthDay> {
         require(!toInclusive.isBefore(from)) { "range inverted" }
         val zone = ZoneId.systemDefault()
         val dates = generateSequence(from) { it.plusDays(1) }.takeWhile { !it.isAfter(toInclusive) }.toList()
@@ -92,38 +118,57 @@ class HealthConnectManager(private val context: Context) {
             }
         }
         dates.forEach { date ->
-            val picked = StepSources.pick(byDateOrigin[date].orEmpty())
+            val picked = StepSources.pick(byDateOrigin[date].orEmpty(), wearablePkg)
             if (picked != null) {
                 stepsBy[date] = picked.second
                 stepsAppBy[date] = picked.first
             }
         }
 
-        val kcalBy = mutableMapOf<LocalDate, Double>()
-        val proteinBy = mutableMapOf<LocalDate, Double>()
+        val kcalByOrigin = mutableMapOf<LocalDate, MutableMap<String, Double>>()
+        val proteinByOrigin = mutableMapOf<LocalDate, MutableMap<String, Double>>()
         readAll(NutritionRecord::class, dayFilter).forEach { r ->
             val d = r.startTime.atZone(zone).toLocalDate()
             if (d !in dates) return@forEach
-            r.energy?.inKilocalories?.let { kcalBy[d] = (kcalBy[d] ?: 0.0) + it }
-            r.protein?.inGrams?.let { proteinBy[d] = (proteinBy[d] ?: 0.0) + it }
+            val pkg = r.metadata.dataOrigin.packageName
+            r.energy?.inKilocalories?.let {
+                kcalByOrigin.getOrPut(d) { mutableMapOf() }[pkg] = (kcalByOrigin[d]?.get(pkg) ?: 0.0) + it
+            }
+            r.protein?.inGrams?.let {
+                proteinByOrigin.getOrPut(d) { mutableMapOf() }[pkg] = (proteinByOrigin[d]?.get(pkg) ?: 0.0) + it
+            }
+        }
+        val kcalBy = mutableMapOf<LocalDate, Double>()
+        val proteinBy = mutableMapOf<LocalDate, Double>()
+        dates.forEach { date ->
+            val food = StepSources.pickDouble(kcalByOrigin[date].orEmpty(), foodPkg)
+            if (food != null) {
+                kcalBy[date] = food.second
+                proteinByOrigin[date]?.get(food.first)?.let { proteinBy[date] = it }
+            }
         }
 
-        val weightSum = mutableMapOf<LocalDate, Double>()
-        val weightN = mutableMapOf<LocalDate, Int>()
+        val weightByOrigin = mutableMapOf<LocalDate, MutableMap<String, Pair<Double, Int>>>()
         readAll(WeightRecord::class, dayFilter).forEach { r ->
             val d = r.time.atZone(zone).toLocalDate()
             if (d !in dates) return@forEach
-            weightSum[d] = (weightSum[d] ?: 0.0) + r.weight.inKilograms
-            weightN[d] = (weightN[d] ?: 0) + 1
+            val pkg = r.metadata.dataOrigin.packageName
+            val cur = weightByOrigin.getOrPut(d) { mutableMapOf() }[pkg] ?: (0.0 to 0)
+            weightByOrigin.getValue(d)[pkg] = (cur.first + r.weight.inKilograms) to (cur.second + 1)
+        }
+        val weightBy = mutableMapOf<LocalDate, Double>()
+        dates.forEach { date ->
+            val avgs = weightByOrigin[date].orEmpty().mapValues { it.value.first / it.value.second.coerceAtLeast(1) }
+            StepSources.pickDouble(avgs, foodPkg)?.let { weightBy[date] = it.second }
         }
 
-        val rhrSum = mutableMapOf<LocalDate, Double>()
-        val rhrN = mutableMapOf<LocalDate, Int>()
+        val rhrByOrigin = mutableMapOf<LocalDate, MutableMap<String, Pair<Double, Int>>>()
         readAll(RestingHeartRateRecord::class, dayFilter).forEach { r ->
             val d = r.time.atZone(zone).toLocalDate()
             if (d !in dates) return@forEach
-            rhrSum[d] = (rhrSum[d] ?: 0.0) + r.beatsPerMinute
-            rhrN[d] = (rhrN[d] ?: 0) + 1
+            val pkg = r.metadata.dataOrigin.packageName
+            val cur = rhrByOrigin.getOrPut(d) { mutableMapOf() }[pkg] ?: (0.0 to 0)
+            rhrByOrigin.getValue(d)[pkg] = (cur.first + r.beatsPerMinute) to (cur.second + 1)
         }
 
         val sleepSessions = readAll(SleepSessionRecord::class, nightFilter)
@@ -132,19 +177,31 @@ class HealthConnectManager(private val context: Context) {
         return dates.associateWith { date ->
             val nightStart = HealthWindows.nightStart(date, zone)
             val nightEnd = HealthWindows.nightEnd(date, zone)
-            val sleepSec = sleepSessions.sumOf { HealthWindows.overlapSeconds(it.startTime, it.endTime, nightStart, nightEnd) }
-            val hrvVals = hrvRecords.mapNotNull { r ->
-                r.time.takeIf { HealthWindows.inNight(it, date, zone) }?.let { r.heartRateVariabilityMillis }
+            val sleepByOrigin = mutableMapOf<String, Long>()
+            sleepSessions.forEach { s ->
+                val sec = HealthWindows.overlapSeconds(s.startTime, s.endTime, nightStart, nightEnd)
+                if (sec > 0) {
+                    val pkg = s.metadata.dataOrigin.packageName
+                    sleepByOrigin[pkg] = (sleepByOrigin[pkg] ?: 0L) + sec
+                }
             }
-            val wn = weightN[date] ?: 0
-            val rn = rhrN[date] ?: 0
+            val sleepPick = StepSources.pick(sleepByOrigin, wearablePkg)
+            val hrvByOrigin = mutableMapOf<String, MutableList<Double>>()
+            hrvRecords.forEach { r ->
+                if (HealthWindows.inNight(r.time, date, zone)) {
+                    hrvByOrigin.getOrPut(r.metadata.dataOrigin.packageName) { mutableListOf() } += r.heartRateVariabilityMillis
+                }
+            }
+            val hrvPick = StepSources.pickDouble(hrvByOrigin.mapValues { it.value.average() }, wearablePkg)
+            val rhrAvgs = rhrByOrigin[date].orEmpty().mapValues { it.value.first / it.value.second.coerceAtLeast(1) }
+            val rhrPick = StepSources.pickDouble(rhrAvgs, wearablePkg)
             HealthDay(
                 date = date,
                 steps = stepsBy[date],
-                sleepHours = sleepSec.takeIf { it > 0 }?.div(3600.0),
-                rhr = if (rn > 0) (rhrSum[date]!! / rn).toLong() else null,
-                hrvMs = hrvVals.takeIf { it.isNotEmpty() }?.average(),
-                weightKg = if (wn > 0) weightSum[date]!! / wn else null,
+                sleepHours = sleepPick?.second?.div(3600.0),
+                rhr = rhrPick?.second?.toLong(),
+                hrvMs = hrvPick?.second,
+                weightKg = weightBy[date],
                 kcal = kcalBy[date],
                 proteinG = proteinBy[date],
                 stepsApp = stepsAppBy[date],

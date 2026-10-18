@@ -33,7 +33,7 @@ fun ReviewScreen(vm: AppViewModel) {
             else "Prep Tracker estimate — ${energy.tdee?.roundToInt()?.toString() ?: "—"} kcal TDEE → ${target.kcal} kcal",
             buildString {
                 append("Window ${energy.windowDays} days · ${energy.confidence} · ${energy.intakeDays} logged intake days. ")
-                append("This is not MacroFactor's TDEE — Health Connect has no field for it, and the two will disagree by 100–200 kcal. MacroFactor wins where they conflict. ")
+                append("This is Grit's own TDEE from intake vs scale. Health Connect has no TDEE field, so another diet app may disagree by 100 to 200 kcal. ")
                 if (energy.confidence == EnergyEstimate.Confidence.NONE || energy.confidence == EnergyEstimate.Confidence.LOW)
                     append("Early in a cut, glycogen and water inflate apparent loss; trustworthy after ~3 weeks of steady logging. ")
                 append(target.rationale)

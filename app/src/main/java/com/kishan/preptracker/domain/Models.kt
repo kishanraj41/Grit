@@ -102,6 +102,10 @@ data class Profile(
     val platesKg: List<Double> = Plates.DEFAULT_PLATES,
     val progPolicy: String = "double",
     val oneRmFormula: String = "epley",
+    /** Health Connect package for steps/sleep/RHR/HRV. Null = Auto (largest writer that day). */
+    val wearablePkg: String? = null,
+    /** Health Connect package for nutrition and scale weight. Null = Auto. */
+    val foodPkg: String? = null,
 )
 
 /** One day's log. *Src fields track where a value came from ("hc" or "manual"); manual always wins on sync. */

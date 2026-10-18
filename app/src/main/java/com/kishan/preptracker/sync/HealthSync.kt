@@ -11,6 +11,7 @@ import com.kishan.preptracker.domain.DayLogModel
 import com.kishan.preptracker.health.HealthConnectManager
 import com.kishan.preptracker.health.HealthDay
 import com.kishan.preptracker.health.StepSources
+import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
@@ -26,8 +27,9 @@ object HealthSync {
         if (!hc.isAvailable || !hc.hasAllPermissions()) return -1
         val today = LocalDate.now()
         val from = today.minusDays((daysBack - 1).coerceAtLeast(0).toLong())
-        val byDate = runCatching { hc.readRange(from, today) }.getOrElse { return -1 }
         val repo = Repository(context)
+        val profile = repo.profile.first()
+        val byDate = runCatching { hc.readRange(from, today, profile.wearablePkg, profile.foodPkg) }.getOrElse { return -1 }
         var updated = 0
         for (i in 0 until daysBack) {
             val date = today.minusDays(i.toLong())
