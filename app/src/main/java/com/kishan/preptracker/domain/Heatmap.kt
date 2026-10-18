@@ -6,8 +6,16 @@ import java.time.LocalDate
 data class HeatCell(val date: LocalDate, val sets: Int)
 
 object Heatmap {
-    fun cells(sessions: Map<LocalDate, SessionData>, weeks: Int = 20, today: LocalDate = LocalDate.now()): List<HeatCell> {
-        val start = today.minusWeeks(weeks.toLong() - 1).with(DayOfWeek.MONDAY)
+    fun cells(
+        sessions: Map<LocalDate, SessionData>,
+        weeks: Int = 20,
+        today: LocalDate = LocalDate.now(),
+        weekStart: String = "mon",
+    ): List<HeatCell> {
+        val first = if (weekStart == "sun") DayOfWeek.SUNDAY else DayOfWeek.MONDAY
+        val anchor = today.minusWeeks(weeks.toLong() - 1)
+        val back = (anchor.dayOfWeek.value - first.value + 7) % 7
+        val start = anchor.minusDays(back.toLong())
         val out = mutableListOf<HeatCell>()
         var d = start
         while (!d.isAfter(today)) {

@@ -106,6 +106,11 @@ data class Profile(
     val wearablePkg: String? = null,
     /** Health Connect package for nutrition and scale weight. Null = Auto. */
     val foodPkg: String? = null,
+    val weekTemplate: String = "v4",
+    val schedule: String = "week",
+    val barKind: String = "barbell45",
+    val weekStart: String = "mon",
+    val restFlash: Boolean = true,
 )
 
 /** One day's log. *Src fields track where a value came from ("hc" or "manual"); manual always wins on sync. */

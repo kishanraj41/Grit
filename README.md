@@ -57,10 +57,10 @@ flowchart LR
 | | Tab | You get |
 | :--- | :--- | :--- |
 | 01 | **Today** | One line of advice. Weight, kcal, protein, sleep, steps, RHR/HRV. 7-day avg and trend. |
-| 02 | **Train** | Standard or Compressed start. `-5` / `+5` lb. Tap to type. US plates on a 45 lb bar. Warm-up, drop, rest-pause, timed, L/R, supersets. Rest timer in the shade. Screen stays awake. |
-| 03 | **Trends** | Drag a chart. Calendar-true gaps. Heatmap. Muscle ready / recovering / tired. Balance vs close-grip bench. Anchor 1RMs in lb. |
+| 02 | **Train** | Standard or Compressed start. `-5` / `+5` lb. Tap to type. US plates on the bar you pick (45 / EZ 25 / trap 55 / smith 30). Warm-up, drop, rest-pause, timed, cardio, RPE, L/R, fail, supersets. Copy a set, move or clone a day, reopen a finished session. Orange flash when rest ends. Screen stays awake. |
+| 03 | **Trends** | Drag a chart. Calendar-true gaps. 52-week heatmap. Muscle Recover / Dose / Quiet. Balance vs close-grip bench. Weight chart goal line. Anchor 1RMs in lb. |
 | 04 | **Review** | Sleep, anchors, rate of loss. Compressed vs Standard. Diet levers. |
-| 05 | **Plan** | Health Connect. JSON backup. Strong / Hevy / FitNotes CSV. Ladder policy. 1RM formula. |
+| 05 | **Plan** | Health Connect. Week shape (v4, PPL, upper/lower, full body) on a weekday clock or next-in-queue. JSON backup. Strong / Hevy / FitNotes CSV. Ladder policy. 1RM formula. |
 
 ## Signature
 
@@ -72,7 +72,7 @@ LOGIC      domain/   pure Kotlin, unit-tested
 STORE      Room      prep.db on device, not the cloud
 ```
 
-**Retention-Recomp Protocol v4** is the week: arms and side-delts, Standard or Compressed by trigger. Energy math is intake vs trend weight (7700 kcal/kg), not a copied TDEE from another app.
+**Retention-Recomp Protocol v4** is the default week: arms and side-delts, Standard or Compressed by trigger. Swap the clock to Push/Pull/Legs, Upper/Lower, or Full body without a second exercise library. Energy math is intake vs trend weight (7700 kcal/kg), not a copied TDEE from another app.
 
 ## Data
 

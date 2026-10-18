@@ -3,6 +3,8 @@ package com.kishan.preptracker.ui.screens
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -36,7 +38,7 @@ fun TrainScreen(vm: AppViewModel) {
     val days by vm.days.collectAsStateWithLifecycle()
     val profile by vm.profile.collectAsStateWithLifecycle()
     var date by remember { mutableStateOf(LocalDate.now()) }
-    val plan = Program.dayFor(date)
+    val plan = Templates.dayFor(date, profile, sessions)
     val session = sessions[date]
     val review = remember(days, sessions, profile, date) { RulesEngine.weeklyReview(date, days, sessions, profile) }
     var plateLoad by remember { mutableStateOf<Double?>(null) }
@@ -44,6 +46,9 @@ fun TrainScreen(vm: AppViewModel) {
     var notes by remember(session?.notes) { mutableStateOf(session?.notes ?: "") }
     var addOpen by remember { mutableStateOf(false) }
     var showMeas by remember { mutableStateOf(session == null) }
+    var moveOpen by remember { mutableStateOf(false) }
+    var cloneOpen by remember { mutableStateOf(false) }
+    val lastDone = sessions.keys.filter { it.isBefore(date) && sessions[it]?.sets?.values?.any { rows -> rows.any { s -> s.done } } == true }.maxOrNull()
     val day = days[date] ?: DayLogModel(date.toString())
     var measWeight by remember(day.weight, day.weightSrc) { mutableStateOf(day.weight?.toString() ?: "") }
     var measWaist by remember(day.waistCm) { mutableStateOf(day.waistCm?.toString() ?: "") }
@@ -88,6 +93,12 @@ fun TrainScreen(vm: AppViewModel) {
             } else {
                 Button(onClick = { vm.startSession(date) }, modifier = Modifier.fillMaxWidth()) { Text("Start session") }
             }
+            if (lastDone != null && sessions[date] == null) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = { vm.cloneInto(lastDone, date) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Repeat ${lastDone.format(DateTimeFormatter.ofPattern("EEE d MMM"))}")
+                }
+            }
             return
         }
 
@@ -112,6 +123,11 @@ fun TrainScreen(vm: AppViewModel) {
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TextButton(onClick = { moveOpen = true }) { Text("Move") }
+            TextButton(onClick = { cloneOpen = true }) { Text("Clone") }
+            if (session.finishedAt != null) TextButton(onClick = { vm.reopenSession(date) }) { Text("Reopen") }
+        }
         Spacer(Modifier.height(8.dp))
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 96.dp)) {
@@ -139,6 +155,7 @@ fun TrainScreen(vm: AppViewModel) {
                     onLoadTap = { load -> plateLoad = load },
                     onLongName = { historyId = ex.id },
                     onAddSet = { vm.addSet(date, ex.id) },
+                    onDuplicateSet = { i -> vm.duplicateSet(date, ex.id, i) },
                     onRemoveSet = { vm.removeSet(date, ex.id) },
                     onFeel = { vm.setFeel(date, ex.id, it) },
                     onSwap = { vm.setVariant(date, ex.id, it) },
@@ -164,7 +181,26 @@ fun TrainScreen(vm: AppViewModel) {
     }
 
     plateLoad?.let { load ->
-        PlateCalculatorDialog(load) { plateLoad = null }
+        PlateCalculatorDialog(load, barKind = profile.barKind) { plateLoad = null }
+    }
+    if (moveOpen) {
+        DatePickDialog(
+            title = "Move session",
+            start = date.plusDays(1),
+            occupied = sessions.keys,
+            onConfirm = { to -> vm.moveSession(date, to); date = to; moveOpen = false },
+            onDismiss = { moveOpen = false },
+        )
+    }
+    if (cloneOpen) {
+        DatePickDialog(
+            title = "Clone session",
+            start = date.plusDays(1),
+            occupied = sessions.keys,
+            confirm = "Clone",
+            onConfirm = { to -> vm.cloneInto(date, to); date = to; cloneOpen = false },
+            onDismiss = { cloneOpen = false },
+        )
     }
     historyId?.let { id ->
         ExerciseHistorySheet(id, date, sessions, days, profile, onDismiss = { historyId = null })
@@ -220,7 +256,7 @@ private fun ExerciseCard(
     onUpdate: (Int, Double?, Int?, Int?) -> Unit, onTick: (Int) -> Unit,
     onPatch: (Int, SetEntry.() -> Unit) -> Unit,
     onLoadTap: (Double) -> Unit, onLongName: () -> Unit,
-    onAddSet: () -> Unit, onRemoveSet: () -> Unit,
+    onAddSet: () -> Unit, onDuplicateSet: (Int) -> Unit = {}, onRemoveSet: () -> Unit,
     onFeel: (String) -> Unit, onSwap: (String?) -> Unit,
     onSuperset: (String?) -> Unit = {},
     onRemoveExercise: () -> Unit = {},
@@ -264,10 +300,12 @@ private fun ExerciseCard(
                     onTick = { onTick(i) },
                     onPatch = { block -> onPatch(i, block) },
                     onPlates = { (s.load ?: presc.load)?.let(onLoadTap) },
+                    onDuplicate = { onDuplicateSet(i) },
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onAddSet, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("+ set") }
+                TextButton(onClick = { if (sets.isNotEmpty()) onDuplicateSet(sets.lastIndex) }, enabled = sets.isNotEmpty(), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("copy last") }
                 TextButton(onClick = onRemoveSet, enabled = sets.isNotEmpty(), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("− set") }
                 Spacer(Modifier.weight(1f))
             }
@@ -299,6 +337,7 @@ private fun ExerciseCard(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SetBlock(
     index: Int,
@@ -309,6 +348,7 @@ private fun SetBlock(
     onTick: () -> Unit,
     onPatch: (SetEntry.() -> Unit) -> Unit,
     onPlates: () -> Unit,
+    onDuplicate: () -> Unit = {},
 ) {
     var typeLoad by remember { mutableStateOf(false) }
     var typed by remember(set.load) { mutableStateOf(Load.displayLb(set.load)) }
@@ -319,6 +359,7 @@ private fun SetBlock(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Set ${index + 1}", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 if (aim != null && set.load == null) Text("aim $aim lb", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton(onClick = onDuplicate, enabled = !set.done, contentPadding = PaddingValues(horizontal = 6.dp)) { Text("copy") }
                 FilledIconToggleButton(checked = set.done, onCheckedChange = { onTick() }, modifier = Modifier.size(44.dp)) { Text("✓") }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -341,8 +382,11 @@ private fun SetBlock(
                 Spacer(Modifier.weight(1f))
                 Text("RIR", style = MaterialTheme.typography.labelMedium)
                 Stepper(set.rir ?: Regex("\\d+").find(ex.rir)?.value?.toInt() ?: 1, enabled = !set.done, min = 0, max = 5, onChange = { onUpdate(set.load, set.reps, it) })
+                Spacer(Modifier.width(8.dp))
+                Text("RPE", style = MaterialTheme.typography.labelMedium)
+                Stepper((set.rpe ?: 8.0).toInt(), enabled = !set.done, min = 5, max = 10, onChange = { onPatch { rpe = it.toDouble() } })
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 FilterChip(selected = set.phase == "warmup", onClick = { onPatch { phase = if (phase == "warmup") "work" else "warmup" } }, enabled = !set.done, label = { Text("WU") })
                 FilterChip(selected = set.kind == "drop", onClick = {
                     onPatch {
@@ -354,12 +398,22 @@ private fun SetBlock(
                 }, enabled = !set.done, label = { Text("Drop") })
                 FilterChip(selected = set.kind == "restpause", onClick = { onPatch { kind = if (kind == "restpause") "straight" else "restpause" } }, enabled = !set.done, label = { Text("RP") })
                 FilterChip(selected = set.kind == "timed", onClick = { onPatch { kind = if (kind == "timed") "straight" else "timed"; if (durationSec == null) durationSec = 30 } }, enabled = !set.done, label = { Text("Time") })
+                FilterChip(selected = set.kind == "cardio", onClick = { onPatch { kind = if (kind == "cardio") "straight" else "cardio"; if (durationSec == null) durationSec = 600 } }, enabled = !set.done, label = { Text("Cardio") })
                 FilterChip(selected = set.perSide, onClick = { onPatch { perSide = !perSide } }, enabled = !set.done, label = { Text("L/R") })
+                FilterChip(selected = set.failure, onClick = { onPatch { failure = !failure } }, enabled = !set.done, label = { Text("Fail") })
             }
             if (set.kind == "timed") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Hold s", style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(48.dp))
                     Stepper(set.durationSec ?: 30, enabled = !set.done, min = 5, max = 300, onChange = { onPatch { durationSec = it } })
+                }
+            }
+            if (set.kind == "cardio") {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Min", style = MaterialTheme.typography.labelMedium)
+                    Stepper(((set.durationSec ?: 600) / 60).coerceAtLeast(1), enabled = !set.done, min = 1, max = 180, onChange = { onPatch { durationSec = it * 60 } })
+                    Text("kph", style = MaterialTheme.typography.labelMedium)
+                    Stepper((set.speedKph ?: 8.0).toInt(), enabled = !set.done, min = 1, max = 25, onChange = { onPatch { speedKph = it.toDouble() } })
                 }
             }
             if (set.perSide) {
@@ -510,5 +564,34 @@ private fun AddExerciseDialog(
                 ) { Text("Add custom exercise") }
             }
         },
+    )
+}
+
+@Composable
+private fun DatePickDialog(
+    title: String,
+    start: LocalDate,
+    occupied: Set<LocalDate>,
+    confirm: String = "Move",
+    onConfirm: (LocalDate) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var d by remember { mutableStateOf(start) }
+    val taken = d in occupied
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { d = d.minusDays(1) }) { Text("◀") }
+                    Text(d.format(DateTimeFormatter.ofPattern("EEE d MMM")), modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                    TextButton(onClick = { d = d.plusDays(1) }) { Text("▶") }
+                }
+                if (taken) Text("That day already has a session.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { TextButton(onClick = { onConfirm(d) }, enabled = !taken) { Text(confirm) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

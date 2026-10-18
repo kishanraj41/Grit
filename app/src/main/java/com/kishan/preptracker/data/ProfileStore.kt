@@ -39,6 +39,11 @@ class ProfileStore(private val context: Context) {
         val oneRmFormula = stringPreferencesKey("oneRmFormula")
         val wearablePkg = stringPreferencesKey("wearablePkg")
         val foodPkg = stringPreferencesKey("foodPkg")
+        val weekTemplate = stringPreferencesKey("weekTemplate")
+        val schedule = stringPreferencesKey("schedule")
+        val barKind = stringPreferencesKey("barKind")
+        val weekStart = stringPreferencesKey("weekStart")
+        val restFlash = booleanPreferencesKey("restFlash")
     }
     val profile: Flow<Profile> = context.dataStore.data.map { p ->
         val d = Profile()
@@ -66,6 +71,11 @@ class ProfileStore(private val context: Context) {
             oneRmFormula = p[K.oneRmFormula] ?: d.oneRmFormula,
             wearablePkg = p[K.wearablePkg],
             foodPkg = p[K.foodPkg],
+            weekTemplate = p[K.weekTemplate] ?: d.weekTemplate,
+            schedule = p[K.schedule] ?: d.schedule,
+            barKind = p[K.barKind] ?: d.barKind,
+            weekStart = p[K.weekStart] ?: d.weekStart,
+            restFlash = p[K.restFlash] ?: d.restFlash,
         )
     }
     suspend fun save(pr: Profile) {
@@ -95,6 +105,11 @@ class ProfileStore(private val context: Context) {
             e[K.oneRmFormula] = pr.oneRmFormula
             if (pr.wearablePkg != null) e[K.wearablePkg] = pr.wearablePkg else e.remove(K.wearablePkg)
             if (pr.foodPkg != null) e[K.foodPkg] = pr.foodPkg else e.remove(K.foodPkg)
+            e[K.weekTemplate] = pr.weekTemplate
+            e[K.schedule] = pr.schedule
+            e[K.barKind] = pr.barKind
+            e[K.weekStart] = pr.weekStart
+            e[K.restFlash] = pr.restFlash
         }
     }
 }

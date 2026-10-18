@@ -1,6 +1,7 @@
 package com.kishan.preptracker.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -8,7 +9,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -31,24 +34,44 @@ fun TrendsScreen(vm: AppViewModel) {
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         ScreenHeader("Trends")
-        val heat = remember(sessions) { Heatmap.cells(sessions) }
-        ChartCard("Training heatmap (work sets)") {
-            HeatGrid(heat)
+        val heat = remember(sessions, profile.weekStart) { Heatmap.cells(sessions, weeks = 52, weekStart = profile.weekStart) }
+        ChartCard("Training heatmap (52 weeks)") {
+            Row(Modifier.horizontalScroll(rememberScrollState())) { HeatGrid(heat) }
         }
         val muscles = remember(sessions) { Muscles.snapshot(LocalDate.now(), sessions) }
+        var muscleMode by remember { mutableStateOf("recover") }
         ChartCard("Muscle status") {
-            muscles.chunked(2).forEach { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(selected = muscleMode == "recover", onClick = { muscleMode = "recover" }, label = { Text("Recover") })
+                FilterChip(selected = muscleMode == "dose", onClick = { muscleMode = "dose" }, label = { Text("Dose") })
+                FilterChip(selected = muscleMode == "quiet", onClick = { muscleMode = "quiet" }, label = { Text("Quiet") })
+            }
+            val shown = when (muscleMode) {
+                "dose" -> muscles.sortedByDescending { it.volume7 }
+                "quiet" -> muscles.sortedByDescending { it.quietDays ?: 999 }
+                else -> muscles
+            }
+            shown.chunked(2).forEach { pair ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     pair.forEach { m ->
+                        val label = when (muscleMode) {
+                            "dose" -> "${m.name} · ${"%.0f".format(m.volume7)} sets"
+                            "quiet" -> "${m.name} · ${m.quietDays?.let { "$it d" } ?: "fresh"}"
+                            else -> "${m.name} · ${m.status}"
+                        }
                         AssistChip(
                             onClick = {},
-                            label = { Text("${m.name} · ${m.status}") },
+                            label = { Text(label) },
                             modifier = Modifier.weight(1f),
                             colors = AssistChipDefaults.assistChipColors(
-                                labelColor = when (m.status) {
-                                    "tired" -> MaterialTheme.colorScheme.error
-                                    "recovering" -> MaterialTheme.colorScheme.primary
-                                    else -> MaterialTheme.colorScheme.onSurface
+                                labelColor = when (muscleMode) {
+                                    "dose" -> if (m.volume7 >= 12) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    "quiet" -> if ((m.quietDays ?: 0) >= 7) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    else -> when (m.status) {
+                                        "tired" -> MaterialTheme.colorScheme.error
+                                        "recovering" -> MaterialTheme.colorScheme.primary
+                                        else -> MaterialTheme.colorScheme.onSurface
+                                    }
                                 },
                             ),
                         )
@@ -56,7 +79,15 @@ fun TrendsScreen(vm: AppViewModel) {
                     if (pair.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
-            Text("Ready < recovering < tired. Half-life is longer for legs and posterior chain.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                when (muscleMode) {
+                    "dose" -> "Hard sets in the last 7 days. Assistants count 0.4."
+                    "quiet" -> "Days since that region last took a work set."
+                    else -> "Ready < recovering < tired. Half-life is longer for legs and posterior chain."
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         val balance = remember(sessions, days, profile) { Balance.snapshot(sessions, days, profile) }
         ChartCard("Balance vs close-grip bench") {
@@ -71,7 +102,7 @@ fun TrendsScreen(vm: AppViewModel) {
         }
         ChartCard("Weight · dots daily, line = trend (α from Plan)") {
             val trend = TrendWeight.compute(weight, profile.trendAlpha)
-            LineChart(weight, overlay = trend, unit = "kg")
+            LineChart(weight, overlay = trend, ref = review.targetWeight, unit = "kg")
         }
         Text("Tap or drag a chart to read a day. X-axis is calendar time, so gaps are real missed days — not a smoothed cartoon.", style = MaterialTheme.typography.bodySmall)
         Text("Target ${"%.1f".format(review.targetWeight)} kg at ${profile.targetBf.toInt()}% (FFM held)${review.toLose?.let { " · %.1f kg to go".format(it) } ?: ""}", style = MaterialTheme.typography.bodySmall)

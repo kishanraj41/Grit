@@ -23,4 +23,10 @@ class LoadTest {
         val kg = Load.stepLb(Load.lbToKg(45.0), -5.0)
         assertEquals("40", Load.displayLb(kg))
     }
+
+    @Test fun `ez bar is 25 lb and trap is 55`() {
+        assertEquals(25.0, Load.barLb("ez"), 0.0)
+        assertEquals(55.0, Load.barLb("trap"), 0.0)
+        assertEquals(45.0, Load.barLb("barbell45"), 0.0)
+    }
 }

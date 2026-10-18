@@ -11,18 +11,19 @@ import com.kishan.preptracker.domain.Load
 import com.kishan.preptracker.domain.Plates
 
 @Composable
-fun PlateCalculatorDialog(loadKg: Double, onDismiss: () -> Unit) {
+fun PlateCalculatorDialog(loadKg: Double, barKind: String = "barbell45", onDismiss: () -> Unit) {
+    val bar = Load.barLb(barKind)
     val loadLb = Load.roundLb(Load.kgToLb(loadKg))
-    val result = Plates.forLoad(loadLb, Load.US_BAR_LB, Load.US_PLATES_LB)
+    val result = Plates.forLoad(loadLb, bar, Load.US_PLATES_LB)
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
         title = { Text("${Load.displayLb(loadKg)} lb") },
         text = {
-            if (result == null) Text("Load is below the ${Load.US_BAR_LB.toInt()} lb bar.")
+            if (result == null) Text("Load is below the ${Load.barLabel(barKind)}.")
             else Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("${Load.US_BAR_LB.toInt()} lb bar")
-                if (result.perSide.isEmpty()) Text("No plates — bar only.")
+                Text(Load.barLabel(barKind))
+                if (result.perSide.isEmpty()) Text("No plates. Bar only.")
                 else Text(
                     "Per side: " + result.perSide.groupingBy { it }.eachCount().entries
                         .joinToString(" + ") { (p, n) ->
@@ -30,7 +31,7 @@ fun PlateCalculatorDialog(loadKg: Double, onDismiss: () -> Unit) {
                             if (n == 1) label else "${n}×$label"
                         },
                 )
-                if (result.leftoverKg > 0) Text("Cannot make exactly — ${"%.1f".format(result.leftoverKg)} lb leftover. Do not invent a plate.")
+                if (result.leftoverKg > 0) Text("Cannot make exactly. ${"%.1f".format(result.leftoverKg)} lb leftover. Do not invent a plate.")
             }
         },
     )

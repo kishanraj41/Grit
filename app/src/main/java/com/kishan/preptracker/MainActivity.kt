@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -31,6 +32,7 @@ import androidx.navigation.compose.rememberNavController
 import com.kishan.preptracker.ui.AppViewModel
 import com.kishan.preptracker.ui.components.RestTimerBar
 import com.kishan.preptracker.ui.screens.*
+import com.kishan.preptracker.ui.theme.GritOrange
 import com.kishan.preptracker.ui.theme.PrepTheme
 
 class MainActivity : ComponentActivity() {
@@ -56,6 +58,7 @@ fun App(vm: AppViewModel) {
     val route = backStack?.destination?.route ?: "today"
     val timerLeft by vm.timerLeft.collectAsStateWithLifecycle()
     val timerTotal by vm.timerTotal.collectAsStateWithLifecycle()
+    val restFlash by vm.restFlashNow.collectAsStateWithLifecycle()
 
     val permLauncher = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
         vm.refreshPermissionState()
@@ -71,6 +74,7 @@ fun App(vm: AppViewModel) {
         Triple("plan", "Plan", Icons.Default.Settings),
     )
 
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
@@ -103,5 +107,9 @@ fun App(vm: AppViewModel) {
                 RestTimerBar(timerLeft, timerTotal, onStop = { vm.stopTimer() }, onPlus = { vm.addTimer(30) })
             }
         }
+    }
+    if (restFlash) {
+        Box(Modifier.fillMaxSize().background(GritOrange.copy(alpha = 0.42f)))
+    }
     }
 }

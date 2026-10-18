@@ -77,7 +77,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /* ---- sessions ---- */
     fun startSession(date: LocalDate, forcedMode: String? = null) = viewModelScope.launch {
         if (sessions.value[date] != null) return@launch
-        val plan = Program.dayFor(date)
+        val plan = Templates.dayFor(date, profile.value, sessions.value)
         val mode = forcedMode ?: RulesEngine.weeklyReview(date, days.value, sessions.value, profile.value).mode
         val sets = plan?.exercises?.associate { pe ->
             val n = if (mode == "C") pe.compressedSets else pe.standardSets
@@ -87,7 +87,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         repo.saveSession(date, SessionData(plan?.key ?: "off", mode, sets, LocalDateTime.now().toString()))
     }
     fun setMode(date: LocalDate, mode: String) = viewModelScope.launch {
-        val s = sessions.value[date] ?: return@launch; val plan = Program.dayFor(date) ?: return@launch
+        val s = sessions.value[date] ?: return@launch; val plan = Templates.dayFor(date, profile.value, sessions.value) ?: return@launch
         s.mode = mode
         plan.exercises.forEach { pe ->
             val n = if (mode == "C") pe.compressedSets else pe.standardSets
@@ -185,6 +185,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (group.isNullOrBlank()) s.supersets.remove(exId) else s.supersets[exId] = group.uppercase().take(1)
         repo.saveSession(date, s)
     }
+    fun duplicateSet(date: LocalDate, exId: String, idx: Int) = viewModelScope.launch {
+        val s = sessions.value[date] ?: return@launch
+        val list = s.sets[exId] ?: return@launch
+        val src = list.getOrNull(idx) ?: return@launch
+        list.add(idx + 1, src.copy(done = false))
+        repo.saveSession(date, s)
+    }
+    fun moveSession(from: LocalDate, to: LocalDate) = viewModelScope.launch {
+        if (from == to) return@launch
+        val s = sessions.value[from] ?: return@launch
+        if (sessions.value[to] != null) return@launch
+        repo.deleteSession(from)
+        repo.saveSession(to, s)
+    }
+    fun reopenSession(date: LocalDate) = viewModelScope.launch {
+        val s = sessions.value[date] ?: return@launch
+        s.finishedAt = null
+        repo.saveSession(date, s)
+    }
+    fun cloneInto(from: LocalDate, to: LocalDate) = viewModelScope.launch {
+        if (sessions.value[to] != null) return@launch
+        val src = sessions.value[from] ?: return@launch
+        val sets = src.sets.mapValues { (_, rows) -> rows.map { it.copy(done = false) }.toMutableList() }.toMutableMap()
+        repo.saveSession(
+            to,
+            SessionData(
+                src.dayKey, src.mode, sets, LocalDateTime.now().toString(),
+                feel = src.feel.toMutableMap(),
+                variant = src.variant.toMutableMap(),
+                extras = src.extras.toMutableMap(),
+                supersets = src.supersets.toMutableMap(),
+            ),
+        )
+    }
+
     fun importWorkoutCsv(uri: Uri) = viewModelScope.launch {
         runCatching {
             val text = getApplication<Application>().contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() }
@@ -239,6 +274,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /* ---- rest timer ---- */
     val timerLeft = MutableStateFlow(0)
     val timerTotal = MutableStateFlow(0)
+    val restFlashNow = MutableStateFlow(false)
     private var timerJob: Job? = null
     fun startTimer(sec: Int) {
         timerJob?.cancel(); timerLeft.value = sec; timerTotal.value = sec
@@ -252,6 +288,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             vibrate()
             RestAlerts.tick(ctx, 0, timerTotal.value)
+            if (profile.value.restFlash) {
+                restFlashNow.value = true
+                delay(900)
+                restFlashNow.value = false
+            }
         }
     }
     fun addTimer(sec: Int) { if (timerJob?.isActive == true) { timerLeft.value += sec; timerTotal.value += sec } }

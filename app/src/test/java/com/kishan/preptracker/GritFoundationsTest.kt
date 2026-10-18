@@ -68,6 +68,14 @@ class MusclesHeatmapCsvTest {
         assertEquals(4, Heatmap.level(30))
     }
 
+    @Test fun `heatmap week start shifts the first cell`() {
+        val today = LocalDate.parse("2026-09-23") // Wednesday
+        val mon = Heatmap.cells(emptyMap(), weeks = 1, today = today, weekStart = "mon")
+        val sun = Heatmap.cells(emptyMap(), weeks = 1, today = today, weekStart = "sun")
+        assertEquals(java.time.DayOfWeek.MONDAY, mon.first().date.dayOfWeek)
+        assertEquals(java.time.DayOfWeek.SUNDAY, sun.first().date.dayOfWeek)
+    }
+
     @Test fun `Strong CSV maps squat onto the v4 catalog`() {
         val csv = """
             Date,Exercise Name,Weight,Reps,Set Order
@@ -87,5 +95,45 @@ class BalanceTest {
     @Test fun `no pressing history is no-data not a fake ratio`() {
         val rows = Balance.snapshot(emptyMap(), emptyMap(), Profile())
         assertTrue(rows.all { it.status == "no-data" })
+    }
+}
+
+class TemplatesTest {
+    @Test fun `v4 weekday clock still lands Monday on arms`() {
+        val d = LocalDate.parse("2026-09-21") // Monday
+        val plan = Templates.dayFor(d, Profile(weekTemplate = "v4", schedule = "week"), emptyMap())
+        assertEquals("mon", plan?.key)
+        assertEquals("Arms + Delts", plan?.name)
+    }
+
+    @Test fun `queue advances to pull after a logged push`() {
+        val d = LocalDate.parse("2026-09-22")
+        val prior = mapOf(
+            d.minusDays(1) to SessionData("push", "S", mutableMapOf(
+                "incbench" to mutableListOf(SetEntry(80.0, 6, 2, true)),
+            ), "t"),
+        )
+        val plan = Templates.dayFor(d, Profile(weekTemplate = "ppl", schedule = "queue"), prior)
+        assertEquals("pull", plan?.key)
+    }
+
+    @Test fun `queue with no history starts at the first slot`() {
+        val d = LocalDate.parse("2026-09-20") // Sunday
+        val plan = Templates.dayFor(d, Profile(weekTemplate = "ppl", schedule = "queue"), emptyMap())
+        assertEquals("push", plan?.key)
+    }
+}
+
+class MuscleDoseTest {
+    @Test fun `seven-day volume counts squat work sets on quads`() {
+        val d = LocalDate.parse("2026-09-22")
+        val sessions = mapOf(
+            d to SessionData("tue", "S", mutableMapOf(
+                "squat" to MutableList(8) { SetEntry(100.0, 5, 2, true) },
+            ), "t"),
+        )
+        val quads = Muscles.snapshot(d, sessions).first { it.id == "quads" }
+        assertEquals(8.0, quads.volume7, 1e-9)
+        assertEquals(0, quads.quietDays)
     }
 }

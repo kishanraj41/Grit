@@ -14,13 +14,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kishan.preptracker.domain.Load
 import com.kishan.preptracker.domain.Program
+import com.kishan.preptracker.domain.Templates
 import com.kishan.preptracker.health.StepSources
 import com.kishan.preptracker.ui.AppViewModel
 import com.kishan.preptracker.ui.components.ScreenHeader
 import java.time.LocalDate
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun PlanScreen(vm: AppViewModel, onRequestPermissions: () -> Unit) {
     val p by vm.profile.collectAsStateWithLifecycle()
@@ -115,6 +117,35 @@ fun PlanScreen(vm: AppViewModel, onRequestPermissions: () -> Unit) {
                     Text(ph.note, style = MaterialTheme.typography.bodySmall)
                 }
             }
+        }
+
+        Text("Week shape", style = MaterialTheme.typography.titleMedium)
+        Text("Same catalog, different clock. v4 stays the prep default.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Templates.ALL.forEach { pack ->
+                FilterChip(selected = p.weekTemplate == pack.id, onClick = { vm.saveProfile(p.copy(weekTemplate = pack.id)) }, label = { Text(pack.name) })
+            }
+        }
+        Text(Templates.pack(p.weekTemplate).blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Schedule", style = MaterialTheme.typography.labelMedium)
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            SegmentedButton(selected = p.schedule == "week", onClick = { vm.saveProfile(p.copy(schedule = "week")) }, shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text("Weekday clock") }
+            SegmentedButton(selected = p.schedule == "queue", onClick = { vm.saveProfile(p.copy(schedule = "queue")) }, shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text("Next in queue") }
+        }
+        Text("Week starts", style = MaterialTheme.typography.labelMedium)
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            SegmentedButton(selected = p.weekStart == "mon", onClick = { vm.saveProfile(p.copy(weekStart = "mon")) }, shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text("Monday") }
+            SegmentedButton(selected = p.weekStart == "sun", onClick = { vm.saveProfile(p.copy(weekStart = "sun")) }, shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text("Sunday") }
+        }
+        Text("Bar for US plates", style = MaterialTheme.typography.labelMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            listOf("barbell45", "ez", "trap", "smith").forEach { kind ->
+                FilterChip(selected = p.barKind == kind, onClick = { vm.saveProfile(p.copy(barKind = kind)) }, label = { Text(Load.barLabel(kind)) })
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Text("Flash orange when rest ends", style = MaterialTheme.typography.bodyMedium)
+            Switch(checked = p.restFlash, onCheckedChange = { vm.saveProfile(p.copy(restFlash = it)) })
         }
 
         Text("Training rules", style = MaterialTheme.typography.titleMedium)

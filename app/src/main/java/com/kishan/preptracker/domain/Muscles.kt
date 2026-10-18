@@ -3,7 +3,15 @@ package com.kishan.preptracker.domain
 import java.time.LocalDate
 import kotlin.math.pow
 
-data class MuscleState(val id: String, val name: String, val fatigue: Double, val status: String, val lastTrained: LocalDate?)
+data class MuscleState(
+    val id: String,
+    val name: String,
+    val fatigue: Double,
+    val status: String,
+    val lastTrained: LocalDate?,
+    val volume7: Double = 0.0,
+    val quietDays: Int? = null,
+)
 
 /**
  * Eighteen drawable regions. Primary movers count 1.0 hard-set, assistants 0.4.
@@ -67,6 +75,7 @@ object Muscles {
     fun snapshot(now: LocalDate, sessions: Map<LocalDate, SessionData>): List<MuscleState> {
         val fatigue = ORDER.associateWith { 0.0 }.toMutableMap()
         val last = mutableMapOf<String, LocalDate>()
+        val volume7 = ORDER.associateWith { 0.0 }.toMutableMap()
         sessions.forEach { (date, session) ->
             val ageH = java.time.temporal.ChronoUnit.HOURS.between(date.atStartOfDay(), now.atStartOfDay()).toDouble().coerceAtLeast(0.0)
             session.sets.forEach { (id, sets) ->
@@ -81,6 +90,10 @@ object Muscles {
                 }
                 pri.forEach { add(it, 1.0) }
                 sec.forEach { add(it, ASSIST) }
+                if (ageH <= 7 * 24) {
+                    pri.forEach { m -> volume7[m] = (volume7[m] ?: 0.0) + hard }
+                    sec.forEach { m -> volume7[m] = (volume7[m] ?: 0.0) + hard * ASSIST }
+                }
             }
         }
         return ORDER.map { id ->
@@ -90,7 +103,8 @@ object Muscles {
                 f < 0.5 -> "recovering"
                 else -> "tired"
             }
-            MuscleState(id, NAMES[id] ?: id, f, status, last[id])
+            val quiet = last[id]?.let { java.time.temporal.ChronoUnit.DAYS.between(it, now).toInt() }
+            MuscleState(id, NAMES[id] ?: id, f, status, last[id], volume7[id] ?: 0.0, quiet)
         }
     }
 }

@@ -11,6 +11,20 @@ object Load {
     const val US_BAR_LB = 45.0
     val US_PLATES_LB = listOf(45.0, 35.0, 25.0, 10.0, 5.0, 2.5)
 
+    fun barLb(kind: String?): Double = when (kind) {
+        "ez" -> 25.0
+        "trap" -> 55.0
+        "smith" -> 30.0
+        else -> US_BAR_LB
+    }
+
+    fun barLabel(kind: String?): String = when (kind) {
+        "ez" -> "EZ bar 25 lb"
+        "trap" -> "Trap bar 55 lb"
+        "smith" -> "Smith 30 lb"
+        else -> "Barbell 45 lb"
+    }
+
     fun kgToLb(kg: Double): Double = kg * LB_PER_KG
     fun lbToKg(lb: Double): Double = lb / LB_PER_KG
 
