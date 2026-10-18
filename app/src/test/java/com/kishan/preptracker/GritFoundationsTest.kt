@@ -1,0 +1,91 @@
+package com.kishan.preptracker
+
+import com.kishan.preptracker.domain.*
+import org.junit.Assert.*
+import org.junit.Test
+import java.time.LocalDate
+
+class OneRepMaxTest {
+    @Test fun `epley 100 x 5 is 116_7`() {
+        assertEquals(100 * (1 + 5 / 30.0), OneRepMax.epley(100.0, 5), 1e-9)
+    }
+
+    @Test fun `a true single is the measurement`() {
+        assertEquals(140.0, OneRepMax.estimate(140.0, 1, OneRepMax.Formula.EPLEY)!!, 1e-9)
+    }
+
+    @Test fun `past the cap epley refuses to guess`() {
+        assertNull(OneRepMax.estimate(60.0, 20, OneRepMax.Formula.EPLEY))
+    }
+}
+
+class LaddersTest {
+    private val squat = Program.EX["squat"]!!
+    private val d = LocalDate.parse("2026-09-22")
+
+    @Test fun `linear adds the increment when every set hits the top`() {
+        val sessions = mapOf(
+            d.minusDays(1) to SessionData("tue", "S", mutableMapOf(
+                "squat" to mutableListOf(SetEntry(100.0, 8, 2, true), SetEntry(100.0, 8, 2, true)),
+            ), "t"),
+        )
+        val p = Ladders.prescribe(Ladder.LINEAR, squat, d, sessions)
+        assertEquals(102.5, p.load!!, 1e-9)
+    }
+
+    @Test fun `warmup sets do not advance the ladder`() {
+        val sessions = mapOf(
+            d.minusDays(1) to SessionData("tue", "S", mutableMapOf(
+                "squat" to mutableListOf(
+                    SetEntry(60.0, 8, 2, true, phase = "warmup"),
+                    SetEntry(100.0, 5, 2, true),
+                ),
+            ), "t"),
+        )
+        val p = Ladders.prescribe(Ladder.DOUBLE, squat, d, sessions)
+        assertEquals(100.0, p.load!!, 1e-9)
+        assertTrue(p.note.contains("aim"))
+    }
+}
+
+class MusclesHeatmapCsvTest {
+    @Test fun `a squat session lights quads and glutes`() {
+        val d = LocalDate.parse("2026-09-22")
+        val sessions = mapOf(
+            d to SessionData("tue", "S", mutableMapOf(
+                "squat" to MutableList(8) { SetEntry(100.0, 5, 2, true) },
+            ), "t"),
+        )
+        val snap = Muscles.snapshot(d, sessions)
+        val quads = snap.first { it.id == "quads" }
+        assertEquals("tired", quads.status)
+        assertEquals(d, quads.lastTrained)
+        assertEquals("ready", snap.first { it.id == "biceps" }.status)
+    }
+
+    @Test fun `heatmap levels scale with work sets`() {
+        assertEquals(0, Heatmap.level(0))
+        assertEquals(4, Heatmap.level(30))
+    }
+
+    @Test fun `Strong CSV maps squat onto the v4 catalog`() {
+        val csv = """
+            Date,Exercise Name,Weight,Reps,Set Order
+            2026-09-15,High-bar back squat,100,5,1
+            2026-09-15,High-bar back squat,100,5,2
+        """.trimIndent()
+        val parsed = WorkoutCsv.parse(csv)
+        assertEquals(1, parsed.sessions.size)
+        val s = parsed.sessions[LocalDate.parse("2026-09-15")]!!
+        assertEquals(2, s.sets["squat"]?.size)
+        assertEquals(100.0, s.sets["squat"]!![0].load)
+        assertTrue(parsed.unmatched.isEmpty())
+    }
+}
+
+class BalanceTest {
+    @Test fun `no pressing history is no-data not a fake ratio`() {
+        val rows = Balance.snapshot(emptyMap(), emptyMap(), Profile())
+        assertTrue(rows.all { it.status == "no-data" })
+    }
+}

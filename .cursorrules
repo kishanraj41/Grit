@@ -1,0 +1,15 @@
+This is an Android app (Kotlin, Compose, Room, Health Connect) that has never
+been compiled. Work in phases; do not attempt the whole spec at once.
+
+- Run `./gradlew test` before and after every change. The tests in
+  app/src/test/ encode intended behaviour. If a test fails, the test is right
+  and the code is wrong, unless the spec explicitly says to change the test.
+- Do not modify files in domain/ except where a phase says to. That logic was
+  reviewed against published research and is deliberate.
+- Never invent a number. Every threshold, coefficient and constant must either
+  come from this spec or be surfaced in the Plan screen as a user-editable
+  setting. No magic numbers buried in a composable.
+- When something cannot be verified (a Health Connect field that may not exist
+  on this device, a tracker that may not report steps), write the code to
+  degrade to null and show "—" in the UI. Never fabricate a fallback value.
+- Prefer small commits with a one-line message describing the behaviour change.

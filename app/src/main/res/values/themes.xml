@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.PrepTracker" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">#FF0E0E0E</item>
+    </style>
+</resources>
